@@ -30,9 +30,18 @@ def _inject_student_ui_styles():
         """
         <style>
             .student-subtitle{
-                color:#9CA3AF;
+                color:#B8B2CC;
                 margin-top:0.1rem;
                 margin-bottom:0.9rem;
+                font-size:1.02rem;
+            }
+
+            .student-subtitle-center{
+                text-align:center;
+                color:#d8d6e8;
+                margin-top:0.15rem;
+                margin-bottom:0.55rem;
+                font-size:0.98rem;
             }
 
             .student-divider{
@@ -44,11 +53,19 @@ def _inject_student_ui_styles():
 
             .student-welcome{
                 text-align:right;
-                color:#F5F3FF;
-                font-size:1.38rem;
+                color:#F3EEFF;
+                font-size:1.32rem;
                 font-weight:700;
                 margin-top:0.2rem;
-                margin-bottom:0.4rem;
+                margin-bottom:0.5rem;
+            }
+
+            .student-section-title{
+                text-align:left;
+                color:#F5F3FF;
+                font-size:1.75rem;
+                font-weight:700;
+                margin:0 0 0.35rem 0;
             }
 
             .st-key-student-face-shell{
@@ -79,6 +96,13 @@ def _inject_student_ui_styles():
                 box-shadow:
                     0 10px 22px rgba(0,0,0,0.30),
                     0 0 0 1px rgba(139,92,246,0.10) inset;
+            }
+
+            .student-register-note{
+                color:#C4B5FD;
+                font-size:0.92rem;
+                margin-top:0.2rem;
+                margin-bottom:0.6rem;
             }
         </style>
         """,
@@ -114,7 +138,10 @@ def student_dashboard():
 
     c1, c2 = st.columns([2, 1], gap="medium")
     with c1:
-        st.header("Your Enrolled Subjects")
+        st.markdown(
+            "<h2 class='student-section-title'>Your Enrolled Subjects</h2>",
+            unsafe_allow_html=True,
+        )
     with c2:
         if st.button("Enroll in Subject", type="primary", width="stretch"):
             enroll_dialog()
@@ -182,16 +209,16 @@ def student_screen():
     c1, c2 = st.columns([2.1, 1], vertical_alignment="center", gap="medium")
     with c1:
         header_dashboard("Student Dashboard")
-        st.markdown(
-            "<p class='student-subtitle'>Quick secure access with FaceID.</p>",
-            unsafe_allow_html=True,
-        )
     with c2:
         if st.button("Go back to Home", type="secondary", key="student_back_home_btn"):
             st.session_state["login_type"] = None
             st.rerun()
 
     st.markdown("<div class='student-divider'></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<p class='student-subtitle-center'>Quick secure access with FaceID.</p>",
+        unsafe_allow_html=True,
+    )
     st.markdown(
         "<h2 style='text-align:center;margin-bottom:0.6rem;'>Login Using FaceID</h2>",
         unsafe_allow_html=True,
@@ -229,29 +256,39 @@ def student_screen():
                         time.sleep(1)
                         st.rerun()
                 else:
-                    st.info("Face not recognized. You may be a new student.")
                     show_registration = True
 
     if show_registration:
         with center:
             with st.container(border=False, key="student-register-shell"):
                 st.header("Create Student Profile")
+                st.markdown(
+                    "<p class='student-register-note'>Face not recognized. Create your profile below.</p>",
+                    unsafe_allow_html=True,
+                )
                 new_name = st.text_input(
                     "Enter your name",
                     placeholder="E.g. Tanmayee",
                     key="student_register_name",
                 )
                 st.subheader("Optional Voice Enrollment")
-                st.caption("Add voice for voice-only attendance in future classes.")
+                st.caption("Voice enrollment can take extra time on first use.")
+
+                enable_voice_now = st.checkbox(
+                    "Add voice profile now (slower)",
+                    value=False,
+                    key="student_enable_voice_now",
+                )
 
                 audio_data = None
-                try:
-                    audio_data = st.audio_input(
-                        "Record a short phrase like: I am present, my name is Akash.",
-                        key="student_register_audio",
-                    )
-                except Exception:
-                    st.error("Audio input is not available.")
+                if enable_voice_now:
+                    try:
+                        audio_data = st.audio_input(
+                            "Record a short phrase like: I am present, my name is Akash.",
+                            key="student_register_audio",
+                        )
+                    except Exception:
+                        st.error("Audio input is not available.")
 
                 if st.button(
                     "Create Account",
@@ -266,7 +303,7 @@ def student_screen():
                             if encodings:
                                 face_emb = encodings[0].tolist()
                                 voice_emb = None
-                                if audio_data:
+                                if enable_voice_now and audio_data:
                                     voice_emb = get_voice_embedding(audio_data.read())
 
                                 response_data = create_student(
@@ -276,12 +313,11 @@ def student_screen():
                                 )
 
                                 if response_data:
-                                    train_classifier()
+                                    # Skip synchronous model retraining here to keep signup fast.
                                     st.session_state.is_logged_in = True
                                     st.session_state.user_role = "student"
                                     st.session_state.student_data = response_data[0]
                                     st.toast(f"Profile created. Hi {new_name}!")
-                                    time.sleep(1)
                                     st.rerun()
                             else:
                                 st.error("Could not capture facial features for registration.")

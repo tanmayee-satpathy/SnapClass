@@ -107,6 +107,19 @@ def style_base_layout():
                 box-shadow:0 4px 16px rgba(139,92,246,0.18);
             }  
 
+            [data-testid="stCameraInput"] button{
+                background:linear-gradient(135deg, #D946EF, #8B5CF6) !important;
+                color:#F5F3FF !important;
+                border:none !important;
+                font-weight:600 !important;
+                opacity:1 !important;
+            }
+
+            [data-testid="stCameraInput"] button:disabled{
+                opacity:0.82 !important;
+                color:#EEE9FF !important;
+            }
+
             .stTextInput input{
                 background:rgba(255,255,255,0.92) !important;
 
