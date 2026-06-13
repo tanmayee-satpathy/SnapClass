@@ -26,7 +26,6 @@ def home_screen():
             "Student Portal",
             type="primary",
             icon=':material/arrow_outward:',
-            icon_position="right", # placed after text
             use_container_width=True # button use full column width
         ):
             st.session_state['login_type'] = 'student'
@@ -46,7 +45,6 @@ def home_screen():
             "Teacher Portal",
             type="primary",
             icon=':material/arrow_outward:',
-            icon_position="right",
             use_container_width=True
         ):
             st.session_state['login_type'] = 'teacher'
