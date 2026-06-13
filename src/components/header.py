@@ -38,7 +38,7 @@ def header_home():
         margin-bottom:0px;
         background: linear-gradient(135deg,#FFFFFF,#C4B5FD,#8B5CF6); 
         
-        # makes gradient appear inside text
+        /* makes gradient appear inside text */
                 
         -webkit-background-clip:text;
         -webkit-text-fill-color:transparent;
