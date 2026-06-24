@@ -320,3 +320,13 @@ B.Tech(CSE)
 Kalinga Institute of Industrial Technology (KIIT)
 
 ---
+
+## License
+
+This project is licensed under the **MIT License**.
+
+See [LICENSE](LICENSE) for more information.
+
+---
+
+<div align="center">
