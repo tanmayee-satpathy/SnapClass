@@ -413,7 +413,11 @@ def teacher_tab_attendance_records():
     st.header('Attendance Records')
 
     teacher_id = st.session_state.teacher_data['teacher_id']
-    records = get_attendance_for_teacher(teacher_id)
+    try:
+        records = get_attendance_for_teacher(teacher_id)
+    except DatabaseConnectionError as exc:
+        st.error(str(exc))
+        return
 
     if not records:
         return
@@ -512,7 +516,7 @@ def login_teacher(username, password):
         teacher = teacher_login(username, password)
     except DatabaseConnectionError as exc:
         st.error(str(exc))
-        return False
+        return None
 
     if teacher:
         st.session_state.user_role ='teacher'
@@ -571,14 +575,15 @@ def teacher_screen_login():
 
         with btnc1:
             if st.button('Login', icon=':material/passkey:', width='stretch'):
-                if login_teacher(teacher_username, teacher_pass):
+                login_result = login_teacher(teacher_username, teacher_pass)
+                if login_result:
                     st.toast("welcome back!", icon="👋")
                     import time
                     time.sleep(1)
                     st.rerun()
                     st.caption("Shortcut: Ctrl + Enter")
 
-                else:
+                elif login_result is False:
                     st.error("Invalid username and password combo")
 
         with btnc2:

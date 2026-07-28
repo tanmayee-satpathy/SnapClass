@@ -1,6 +1,15 @@
 from src.database.config import supabase
 import bcrypt # password hashing library
 import httpx
+import logging
+
+try:
+    from postgrest.exceptions import APIError as PostgrestAPIError
+except ImportError:  # pragma: no cover - depends on supabase package version
+    PostgrestAPIError = ()
+
+
+logger = logging.getLogger(__name__)
 
 
 class DatabaseConnectionError(RuntimeError):
@@ -10,11 +19,42 @@ class DatabaseConnectionError(RuntimeError):
 def _execute(request):
     try:
         return request.execute()
+    except PostgrestAPIError as exc:
+        logger.exception("Supabase API request failed")
+        raise DatabaseConnectionError(_friendly_api_error_message(exc)) from exc
     except httpx.HTTPError as exc:
+        logger.exception("Supabase HTTP request failed")
         raise DatabaseConnectionError(
             "Could not connect to the database. Please check your internet connection "
             "and Supabase settings, then try again."
         ) from exc
+
+
+def _friendly_api_error_message(exc):
+    error_text = str(exc).lower()
+
+    if "jwt" in error_text or "api key" in error_text or "unauthorized" in error_text:
+        return (
+            "Database authentication failed. Please check your Supabase URL and API key "
+            "in Streamlit secrets."
+        )
+
+    if "relation" in error_text and "does not exist" in error_text:
+        return (
+            "A required database table is missing. Please confirm your Supabase schema "
+            "contains teachers, students, subjects, subject_students, and attendance_logs."
+        )
+
+    if "permission denied" in error_text or "row-level security" in error_text or "rls" in error_text:
+        return (
+            "The database blocked this request. Please check your Supabase row-level "
+            "security policies for this table."
+        )
+
+    return (
+        "The database rejected this request. Please check your Supabase schema, "
+        "table policies, and Streamlit secrets."
+    )
 
 
 def hash_pass(pwd):
