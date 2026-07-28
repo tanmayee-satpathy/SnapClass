@@ -12,6 +12,7 @@ from src.components.subject_card import subject_card
 
 from src.database.db import (
     create_student,
+    DatabaseConnectionError,
     get_all_students,
     get_student_attendance,
     get_student_subjects,
@@ -147,9 +148,14 @@ def student_dashboard():
         if st.button("Enroll in Subject", type="primary", width="stretch"):
             enroll_dialog()
 
-    with st.spinner("Loading your enrolled subjects..."):
-        subjects = get_student_subjects(student_id)
-        logs = get_student_attendance(student_id)
+    try:
+        with st.spinner("Loading your enrolled subjects..."):
+            subjects = get_student_subjects(student_id)
+            logs = get_student_attendance(student_id)
+    except DatabaseConnectionError as exc:
+        st.error(str(exc))
+        footer_dashboard()
+        return
 
     if not subjects:
         st.info("You are not enrolled in any subject yet. Use the button above to join one.")
@@ -234,30 +240,40 @@ def student_screen():
 
     if photo_source:
         img = np.array(Image.open(photo_source))
-        with st.spinner("AI is scanning..."):
-            detected, _, num_faces = predict_attendance(img)
+        try:
+            with st.spinner("AI is scanning..."):
+                detected, _, num_faces = predict_attendance(img)
+        except DatabaseConnectionError as exc:
+            st.error(str(exc))
+            footer_dashboard()
+            return
 
-            if num_faces == 0:
-                st.warning("Face not found.")
-            elif num_faces > 1:
-                st.warning("Multiple faces found. Please keep only one face in frame.")
-            else:
-                if detected:
-                    student_id = list(detected.keys())[0]
+        if num_faces == 0:
+            st.warning("Face not found.")
+        elif num_faces > 1:
+            st.warning("Multiple faces found. Please keep only one face in frame.")
+        else:
+            if detected:
+                student_id = list(detected.keys())[0]
+                try:
                     all_students = get_all_students()
-                    student = next(
-                        (s for s in all_students if s["student_id"] == student_id),
-                        None,
-                    )
-                    if student:
-                        st.session_state.is_logged_in = True
-                        st.session_state.user_role = "student"
-                        st.session_state.student_data = student
-                        st.toast(f"Welcome back {student['name']}")
-                        time.sleep(1)
-                        st.rerun()
-                else:
-                    show_registration = True
+                except DatabaseConnectionError as exc:
+                    st.error(str(exc))
+                    footer_dashboard()
+                    return
+                student = next(
+                    (s for s in all_students if s["student_id"] == student_id),
+                    None,
+                )
+                if student:
+                    st.session_state.is_logged_in = True
+                    st.session_state.user_role = "student"
+                    st.session_state.student_data = student
+                    st.toast(f"Welcome back {student['name']}")
+                    time.sleep(1)
+                    st.rerun()
+            else:
+                show_registration = True
 
     if show_registration:
         with center:
@@ -307,11 +323,15 @@ def student_screen():
                                 if enable_voice_now and audio_data:
                                     voice_emb = get_voice_embedding(audio_data.read())
 
-                                response_data = create_student(
-                                    new_name,
-                                    face_embedding=face_emb,
-                                    voice_embedding=voice_emb,
-                                )
+                                try:
+                                    response_data = create_student(
+                                        new_name,
+                                        face_embedding=face_emb,
+                                        voice_embedding=voice_emb,
+                                    )
+                                except DatabaseConnectionError as exc:
+                                    st.error(str(exc))
+                                    return
 
                                 if response_data:
                                     # Skip synchronous model retraining here to keep signup fast.

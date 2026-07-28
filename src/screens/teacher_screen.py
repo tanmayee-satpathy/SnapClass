@@ -7,7 +7,15 @@ from src.components.header import header_dashboard
 from src.components.footer import footer_dashboard
 from src.components.subject_card import subject_card
 
-from src.database.db import check_teacher_exists, create_teacher, teacher_login, get_teacher_subjects, get_attendance_for_teacher
+from src.database.db import (
+    check_teacher_exists,
+    create_teacher,
+    DatabaseConnectionError,
+    get_attendance_for_teacher,
+    get_enrolled_students_for_subject,
+    get_teacher_subjects,
+    teacher_login,
+)
 from src.components.dialog_create_subject import create_subject_dialog
 from src.components.dialog_share_subject import share_subject_dialog
 from src.components.dialog_add_photo import add_photos_dialog
@@ -19,8 +27,6 @@ import numpy as np # img to numpy array
 from datetime import datetime # attendance timestamp
 
 import pandas as pd
-
-from src.database.config import supabase
 
 from src.components.dialog_voice_attendance import voice_attendance_dialog
 
@@ -143,7 +149,11 @@ def teacher_tab_take_attendance():
     if 'attendance_images' not in st.session_state:
         st.session_state.attendance_images = []
 
-    subjects = get_teacher_subjects(teacher_id)
+    try:
+        subjects = get_teacher_subjects(teacher_id)
+    except DatabaseConnectionError as exc:
+        st.error(str(exc))
+        return
 
     if not subjects:
         st.warning('You havent created any subjects yet! Please create one to begin!')
@@ -228,18 +238,22 @@ def teacher_tab_take_attendance():
 
                     for idx, img in enumerate(st.session_state.attendance_images):
                         img_np = np.array(img.convert('RGB')) # PIL img --> numpy RGB array
-                        detected, _, _ = predict_attendance(img_np)
+                        try:
+                            detected, _, _ = predict_attendance(img_np)
+                        except DatabaseConnectionError as exc:
+                            st.error(str(exc))
+                            return
 
                         if detected:
                             for sid in detected.keys():
                                 student_id = int(sid)
                                 all_detected_ids.setdefault(student_id, []).append(f"Photo {idx+1}")
 
-                    enrolled_res = supabase.table('subject_students').select(
-                        "*, students(*)"
-                    ).eq('subject_id', selected_subject_id).execute()
-
-                    enrolled_students = enrolled_res.data
+                    try:
+                        enrolled_students = get_enrolled_students_for_subject(selected_subject_id)
+                    except DatabaseConnectionError as exc:
+                        st.error(str(exc))
+                        return
 
                     if not enrolled_students:
                         st.warning('No students enrolled in this course')
@@ -305,7 +319,11 @@ def teacher_tab_manage_subjects():
 
 
     # LIST all SUBJECTS
-    subjects = get_teacher_subjects(teacher_id)
+    try:
+        subjects = get_teacher_subjects(teacher_id)
+    except DatabaseConnectionError as exc:
+        st.error(str(exc))
+        return
     if subjects:
         for sub in subjects:
 
@@ -345,7 +363,11 @@ def _teacher_tab_attendance_records_legacy():
 
     teacher_id = st.session_state.teacher_data['teacher_id']
 
-    records = get_attendance_for_teacher(teacher_id)
+    try:
+        records = get_attendance_for_teacher(teacher_id)
+    except DatabaseConnectionError as exc:
+        st.error(str(exc))
+        return
 
     if not records:
         return
@@ -486,7 +508,11 @@ def login_teacher(username, password):
     if not username or not password:
         return False
     
-    teacher = teacher_login(username, password)
+    try:
+        teacher = teacher_login(username, password)
+    except DatabaseConnectionError as exc:
+        st.error(str(exc))
+        return False
 
     if teacher:
         st.session_state.user_role ='teacher'
@@ -563,15 +589,20 @@ def teacher_screen_login():
 def register_teacher(teacher_username, teacher_name, teacher_pass, teacher_pass_confirm):
     if not teacher_username or not teacher_name or not teacher_pass:
         return False, "All Fields are required!"
-    if check_teacher_exists(teacher_username):
-        return False, "Username already taken"
+    try:
+        if check_teacher_exists(teacher_username):
+            return False, "Username already taken"
+    except DatabaseConnectionError as exc:
+        return False, str(exc)
     if teacher_pass != teacher_pass_confirm:
         return False, "Password doesn't match"
     
     try:
         create_teacher(teacher_username, teacher_pass, teacher_name)
         return True, "Sucessfully Created! Login Now"
-    except Exception as e:
+    except DatabaseConnectionError as exc:
+        return False, str(exc)
+    except Exception:
         return False, "Unexpected Error!"
     
 

@@ -1,8 +1,5 @@
 import streamlit as st
-from src.database.db import enroll_student_to_subject
-from src.database.config import supabase
-import time
-from src.database.db import create_attendance
+from src.database.db import create_attendance, DatabaseConnectionError
 
 
 def show_attendance_result(df, logs):
@@ -25,7 +22,9 @@ def show_attendance_result(df, logs):
                 st.session_state.attendance_images = []
                 st.session_state.voice_attendance_results = None
                 st.rerun()
-            except Exception as e:
+            except DatabaseConnectionError as exc:
+                st.error(str(exc))
+            except Exception:
                 st.error('Sync failed!')
 
 

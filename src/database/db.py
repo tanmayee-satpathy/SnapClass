@@ -1,5 +1,20 @@
 from src.database.config import supabase
 import bcrypt # password hashing library
+import httpx
+
+
+class DatabaseConnectionError(RuntimeError):
+    """Raised when Supabase cannot be reached from the app runtime."""
+
+
+def _execute(request):
+    try:
+        return request.execute()
+    except httpx.HTTPError as exc:
+        raise DatabaseConnectionError(
+            "Could not connect to the database. Please check your internet connection "
+            "and Supabase settings, then try again."
+        ) from exc
 
 
 def hash_pass(pwd):
@@ -12,17 +27,17 @@ def check_pass(pwd,hashed):
 
 
 def check_teacher_exists(username):
-    response = supabase.table("teachers").select("username").eq("username",username).execute()
+    response = _execute(supabase.table("teachers").select("username").eq("username",username))
     return len(response.data) > 0
 
 
 def create_teacher(username,password,name):
     data = {"username" : username, "password":hash_pass(password),"name":name}
-    response = supabase.table("teachers").insert(data).execute()
+    response = _execute(supabase.table("teachers").insert(data))
     return response.data
 
 def teacher_login(username,password):
-    response = supabase.table("teachers").select("*").eq("username",username).execute()
+    response = _execute(supabase.table("teachers").select("*").eq("username",username))
     if response.data:
         teacher = response.data[0]
         if check_pass(password,teacher['password']):
@@ -31,21 +46,21 @@ def teacher_login(username,password):
 
 
 def get_all_students():
-    response = supabase.table('students').select("*").execute()
+    response = _execute(supabase.table('students').select("*"))
     return response.data
 
 def create_student(new_name,face_embedding=None,voice_embedding=None):
     data = {'name':new_name,'face_embedding':face_embedding,'voice_embedding':voice_embedding}
-    response = supabase.table("students").insert(data).execute()
+    response = _execute(supabase.table("students").insert(data))
     return response.data
 
 def create_subject(subject_code,name,section,teacher_id):
     data = {"subject_code":subject_code,"name":name,"section":section,"teacher_id":teacher_id}
-    response = supabase.table("subjects").insert(data).execute()
+    response = _execute(supabase.table("subjects").insert(data))
     return response.data
 
 def get_teacher_subjects(teacher_id):
-    response = supabase.table('subjects').select("*, subject_students(count), attendance_logs(timestamp)").eq("teacher_id", teacher_id).execute()
+    response = _execute(supabase.table('subjects').select("*, subject_students(count), attendance_logs(timestamp)").eq("teacher_id", teacher_id))
     subjects = response.data
 
 
@@ -63,27 +78,55 @@ def get_teacher_subjects(teacher_id):
 
 def  enroll_student_to_subject(student_id, subject_id):
     data = {'student_id': student_id, "subject_id": subject_id}
-    response= supabase.table('subject_students').insert(data).execute()
+    response= _execute(supabase.table('subject_students').insert(data))
     return response.data
 
 
 def  unenroll_student_to_subject(student_id, subject_id):
-    response= supabase.table('subject_students').delete().eq('student_id', student_id).eq('subject_id', subject_id).execute()
+    response= _execute(supabase.table('subject_students').delete().eq('student_id', student_id).eq('subject_id', subject_id))
     return response.data
 
 def get_student_subjects(student_id):
-    response = supabase.table('subject_students').select('*, subjects(*)').eq('student_id', student_id).execute()
+    response = _execute(supabase.table('subject_students').select('*, subjects(*)').eq('student_id', student_id))
+    return response.data
+
+
+def get_subject_by_code(subject_code):
+    response = _execute(
+        supabase.table('subjects')
+        .select('subject_id, name, subject_code')
+        .eq('subject_code', subject_code)
+    )
+    return response.data[0] if response.data else None
+
+
+def is_student_enrolled(student_id, subject_id):
+    response = _execute(
+        supabase.table('subject_students')
+        .select('*')
+        .eq('subject_id', subject_id)
+        .eq('student_id', student_id)
+    )
+    return bool(response.data)
+
+
+def get_enrolled_students_for_subject(subject_id):
+    response = _execute(
+        supabase.table('subject_students')
+        .select("*, students(*)")
+        .eq('subject_id', subject_id)
+    )
     return response.data
 
 
 def get_student_attendance(student_id):
-    response = supabase.table('attendance_logs').select('*, subjects(*)').eq('student_id', student_id).execute()
+    response = _execute(supabase.table('attendance_logs').select('*, subjects(*)').eq('student_id', student_id))
     return response.data
 
 def create_attendance(logs):
-    response = supabase.table('attendance_logs').insert(logs).execute()
+    response = _execute(supabase.table('attendance_logs').insert(logs))
     return response.data
 
 def get_attendance_for_teacher(teacher_id):
-    response = supabase.table('attendance_logs').select("*, subjects!inner(*)").eq('subjects.teacher_id', teacher_id).execute()
+    response = _execute(supabase.table('attendance_logs').select("*, subjects!inner(*)").eq('subjects.teacher_id', teacher_id))
     return response.data

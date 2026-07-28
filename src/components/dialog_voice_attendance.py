@@ -1,6 +1,6 @@
 import streamlit as st
 from src.pipelines.voice_pipeline import process_bulk_audio
-from src.database.config import supabase
+from src.database.db import DatabaseConnectionError, get_enrolled_students_for_subject
 import pandas as pd
 from src.components.dialog_attendance_results import show_attendance_result
 from datetime import datetime
@@ -16,8 +16,11 @@ def voice_attendance_dialog(selected_subject_id):
 
     if st.button('Analyze Audio', width='stretch', type='primary'):
         with st.spinner('Prcessing Audio data'):
-            enrolled_res = supabase.table('subject_students').select("*, students(*)").eq('subject_id',selected_subject_id ).execute()
-            enrolled_students = enrolled_res.data
+            try:
+                enrolled_students = get_enrolled_students_for_subject(selected_subject_id)
+            except DatabaseConnectionError as exc:
+                st.error(str(exc))
+                return
 
             if not enrolled_students:
                 st.warning('No students enrolled in this course')
