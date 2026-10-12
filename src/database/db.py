@@ -64,6 +64,12 @@ def _friendly_api_error_message(exc):
             "Check the SnapClass database schema."
         )
 
+    if "null value" in error_text and "not-null constraint" in error_text:
+        return (
+            "Supabase rejected a blank value for a required column. "
+            "Check that auto-generated ID columns are configured correctly."
+        )
+
     if any(term in error_text for term in (
         "permission denied", "row-level security",
         "violates row-level security policy", "rls"
@@ -138,7 +144,6 @@ def get_all_students():
 
 def create_student(new_name, face_embedding=None, voice_embedding=None):
     data = {
-        "student_id": None,
         "name": new_name,
         "face_embedding": face_embedding,
         "voice_embedding": voice_embedding,
