@@ -46,7 +46,8 @@ def _execute(request):
 
 
 def _friendly_api_error_message(exc):
-    error_text = str(exc).lower()
+    raw_error_text = _api_error_text(exc)
+    error_text = raw_error_text.lower()
 
     if any(term in error_text for term in (
         "jwt", "api key", "unauthorized", "invalid api key"
@@ -72,17 +73,40 @@ def _friendly_api_error_message(exc):
 
     if any(term in error_text for term in (
         "permission denied", "row-level security",
-        "violates row-level security policy", "rls"
+        "violates row-level security policy", "rls", "42501"
     )):
         return (
             "Supabase blocked the database request. "
             "Check table permissions and Row Level Security policies."
         )
 
+    if "foreign key constraint" in error_text:
+        return (
+            "Supabase rejected the row because it references missing data. "
+            "Check that the student is enrolled in the selected subject."
+        )
+
+    if "duplicate key" in error_text:
+        return (
+            "Supabase rejected a duplicate attendance row. "
+            "This attendance may already have been saved."
+        )
+
     return (
         "Supabase rejected the database request. "
-        "Check the detailed application logs."
+        f"Details: {raw_error_text}"
     )
+
+
+def _api_error_text(exc):
+    parts = [str(exc)]
+
+    for attr in ("message", "details", "hint", "code"):
+        value = getattr(exc, attr, None)
+        if value:
+            parts.append(str(value))
+
+    return " | ".join(dict.fromkeys(parts))
 
 
 def hash_pass(pwd):
