@@ -273,7 +273,36 @@ def student_screen():
                     time.sleep(1)
                     st.rerun()
             else:
-                show_registration = True
+                try:
+                    with st.spinner("Refreshing face profiles..."):
+                        train_classifier()
+                        detected, _, _ = predict_attendance(img)
+                except DatabaseConnectionError as exc:
+                    st.error(str(exc))
+                    footer_dashboard()
+                    return
+
+                if detected:
+                    student_id = list(detected.keys())[0]
+                    try:
+                        all_students = get_all_students()
+                    except DatabaseConnectionError as exc:
+                        st.error(str(exc))
+                        footer_dashboard()
+                        return
+                    student = next(
+                        (s for s in all_students if s["student_id"] == student_id),
+                        None,
+                    )
+                    if student:
+                        st.session_state.is_logged_in = True
+                        st.session_state.user_role = "student"
+                        st.session_state.student_data = student
+                        st.toast(f"Welcome back {student['name']}")
+                        time.sleep(1)
+                        st.rerun()
+                else:
+                    show_registration = True
 
     if show_registration:
         with center:
@@ -334,7 +363,7 @@ def student_screen():
                                     return
 
                                 if response_data:
-                                    # Skip synchronous model retraining here to keep signup fast.
+                                    train_classifier()
                                     st.session_state.is_logged_in = True
                                     st.session_state.user_role = "student"
                                     st.session_state.student_data = response_data[0]
