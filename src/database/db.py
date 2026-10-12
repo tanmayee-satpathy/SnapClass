@@ -138,10 +138,12 @@ def get_all_students():
 
 def create_student(new_name, face_embedding=None, voice_embedding=None):
     data = {
+        "student_id": None,
         "name": new_name,
         "face_embedding": face_embedding,
         "voice_embedding": voice_embedding,
     }
+
     response = _execute(
         supabase.table("students").insert(data)
     )
